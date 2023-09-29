@@ -153,7 +153,7 @@ def send_oauth_error(err=None):
     realm = 'OAuth'
     header = oauth.build_authenticate_header(realm=realm)
 
-    for k, v in list(header.items()):
+    for k, v in header.items():
         response[k] = v
 
     return response
@@ -271,7 +271,7 @@ class OAuthAuthentication(object):
             try:
                 consumer, token, parameters = self.validate_token(request)
             except oauth.OAuthError as err:
-                print((send_oauth_error(err)))
+                print(send_oauth_error(err))
                 return False
 
             if consumer and token:
@@ -297,7 +297,7 @@ class OAuthAuthentication(object):
         response.status_code = 401
         realm = 'API'
 
-        for k, v in list(self.builder(realm=realm).items()):
+        for k, v in self.builder(realm=realm).items():
             response[k] = v
         tmpl = loader.render_to_string('oauth/challenge.html', {'MEDIA_URL': settings.MEDIA_URL})
 
