@@ -1,6 +1,5 @@
 import time
 from datetime import datetime, timedelta
-from .decorator import decorator
 from django import get_version as django_version
 from django.conf import settings
 from django.core.cache import cache
@@ -9,6 +8,8 @@ from django.core.urlresolvers import reverse
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseNotAllowed
 from django.template import loader, TemplateDoesNotExist
 from django.utils.translation import ugettext as _
+
+from .decorator import decorator
 
 __version__ = '0.2.3rc1'
 
@@ -268,7 +269,14 @@ class Mimer(object):
 
             if loadee:
                 try:
-                    self.request.data = loadee(self.request.body)
+                    incoming_data = self.request.body
+                    if ctype == 'application/json' and type(incoming_data) is bytes:
+                        # If by some cursed miracle, we're dealing with a bytestring,
+                        # then decode it back to a normal string, because json.loads
+                        # will *not* handle binary data
+                        incoming_data = incoming_data.decode('utf-8')
+
+                    self.request.data = loadee(incoming_data)
 
                     # Reset both POST and PUT from request, as its
                     # misleading having their presence around.
