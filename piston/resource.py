@@ -1,15 +1,12 @@
 import inspect
 import sys
+import traceback
+
 from django.conf import settings
 from django.core.mail import EmailMessage, send_mail
 from django.db.models.query import QuerySet
-from django.http import (
-    Http404,
-    HttpResponse,
-    HttpResponseForbidden,
-    HttpResponseNotAllowed,
-    HttpResponseServerError,
-)
+from django.http import (Http404, HttpResponse, HttpResponseForbidden,
+                         HttpResponseNotAllowed, HttpResponseServerError)
 from django.views.debug import ExceptionReporter
 from django.views.decorators.vary import vary_on_headers
 
@@ -17,15 +14,8 @@ from .authentication import NoAuthentication
 from .doc import HandlerMethod
 from .emitters import Emitter
 from .handler import typemapper
-from .utils import (
-    coerce_put_post,
-    format_error,
-    FormValidationError,
-    HttpStatusCode,
-    MimerDataException,
-    rc,
-    translate_mime,
-)
+from .utils import (FormValidationError, HttpStatusCode, MimerDataException,
+                    coerce_put_post, format_error, rc, translate_mime)
 
 CHALLENGE = object()
 
@@ -267,6 +257,8 @@ class Resource(object):
         Override this method to add handling of errors customized for your
         needs
         """
+        traceback.print_exc()
+
         if isinstance(e, FormValidationError):
             return self.form_validation_response(e)
 
