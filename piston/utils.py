@@ -1,12 +1,14 @@
 import time
 from datetime import datetime, timedelta
+
 from django import get_version as django_version
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import mail_admins, send_mail
 from django.core.urlresolvers import reverse
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseNotAllowed
-from django.template import loader, TemplateDoesNotExist
+from django.http import (HttpResponse, HttpResponseBadRequest,
+                         HttpResponseForbidden, HttpResponseNotAllowed)
+from django.template import TemplateDoesNotExist, loader
 from django.utils.translation import ugettext as _
 
 from .decorator import decorator
@@ -270,7 +272,8 @@ class Mimer(object):
             if loadee:
                 try:
                     incoming_data = self.request.body
-                    if ctype == 'application/json' and type(incoming_data) is bytes:
+                    if 'application/json' in ctype and type(incoming_data) is bytes:
+                        # Covers 'application/json' and 'application/json; charset=utf-8' equally
                         # If by some cursed miracle, we're dealing with a bytestring,
                         # then decode it back to a normal string, because json.loads
                         # will *not* handle binary data
