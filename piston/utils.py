@@ -5,15 +5,19 @@ from django import get_version as django_version
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import mail_admins, send_mail
-from django.core.urlresolvers import reverse
-from django.http import (HttpResponse, HttpResponseBadRequest,
-                         HttpResponseForbidden, HttpResponseNotAllowed)
+from django.http import (
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+    HttpResponseNotAllowed,
+)
 from django.template import TemplateDoesNotExist, loader
+from django.urls import reverse
 from django.utils.translation import ugettext as _
 
 from .decorator import decorator
 
-__version__ = '0.2.3rc1'
+__version__ = "0.2.3rc1"
 
 
 def get_version():
@@ -21,7 +25,11 @@ def get_version():
 
 
 def format_error(error):
-    return "Piston/%s (Django %s) crash report:\n\n%s" % (get_version(), django_version(), error)
+    return "Piston/%s (Django %s) crash report:\n\n%s" % (
+        get_version(),
+        django_version(),
+        error,
+    )
 
 
 class rc_factory(object):
@@ -30,17 +38,17 @@ class rc_factory(object):
     """
 
     CODES = dict(
-        ALL_OK=('OK', 200),
-        CREATED=('Created', 201),
-        DELETED=('', 204),  # 204 says "Don't send a body!"
-        BAD_REQUEST=('Bad Request', 400),
-        FORBIDDEN=('Forbidden', 401),
-        NOT_FOUND=('Not Found', 404),
-        DUPLICATE_ENTRY=('Conflict/Duplicate', 409),
-        NOT_HERE=('Gone', 410),
-        INTERNAL_ERROR=('Internal Error', 500),
-        NOT_IMPLEMENTED=('Not Implemented', 501),
-        THROTTLED=('Throttled', 503),
+        ALL_OK=("OK", 200),
+        CREATED=("Created", 201),
+        DELETED=("", 204),  # 204 says "Don't send a body!"
+        BAD_REQUEST=("Bad Request", 400),
+        FORBIDDEN=("Forbidden", 401),
+        NOT_FOUND=("Not Found", 404),
+        DUPLICATE_ENTRY=("Conflict/Duplicate", 409),
+        NOT_HERE=("Gone", 410),
+        INTERNAL_ERROR=("Internal Error", 500),
+        NOT_IMPLEMENTED=("Not Implemented", 501),
+        THROTTLED=("Throttled", 503),
     )
 
     def __getattr__(self, attr):
@@ -69,7 +77,7 @@ class rc_factory(object):
                 HttpResponse.content although this bug report (feature request)
                 suggests that it should: http://code.djangoproject.com/ticket/9403
                 """
-                if not isinstance(content, str) and hasattr(content, '__iter__'):
+                if not isinstance(content, str) and hasattr(content, "__iter__"):
                     self._container = content
                     self._base_content_is_iter = False
                 else:
@@ -78,7 +86,7 @@ class rc_factory(object):
 
             content = property(HttpResponse.content.getter, _set_content)
 
-        return HttpResponseWrapper(r, content_type='text/plain', status=c)
+        return HttpResponseWrapper(r, content_type="text/plain", status=c)
 
 
 rc = rc_factory()
@@ -94,13 +102,13 @@ class HttpStatusCode(Exception):
         self.response = response
 
 
-def validate(v_form, operation='POST'):
+def validate(v_form, operation="POST"):
     @decorator
     def wrap(f, self, request, *a, **kwa):
         form = v_form(getattr(request, operation))
 
         if form.is_valid():
-            setattr(request, 'form', form)
+            setattr(request, "form", form)
             return f(self, request, *a, **kwa)
         else:
             raise FormValidationError(form)
@@ -108,7 +116,7 @@ def validate(v_form, operation='POST'):
     return wrap
 
 
-def throttle(max_requests, timeout=60 * 60, extra=''):
+def throttle(max_requests, timeout=60 * 60, extra=""):
     """
     Simple throttling decorator, caches
     the amount of requests made in cache.
@@ -127,16 +135,16 @@ def throttle(max_requests, timeout=60 * 60, extra=''):
         if request.user.is_authenticated():
             ident = request.user.username
         else:
-            ident = request.META.get('REMOTE_ADDR', None)
+            ident = request.META.get("REMOTE_ADDR", None)
 
-        if hasattr(request, 'throttle_extra'):
+        if hasattr(request, "throttle_extra"):
             """
             Since we want to be able to throttle on a per-
             application basis, it's important that we realize
             that `throttle_extra` might be set on the request
             object. If so, append the identifier name with it.
             """
-            ident += ':%s' % str(request.throttle_extra)
+            ident += ":%s" % str(request.throttle_extra)
 
         if ident:
             """
@@ -145,7 +153,7 @@ def throttle(max_requests, timeout=60 * 60, extra=''):
             can't use it yet. If someone sees this after it's in
             stable, you can change it here.
             """
-            ident += ':%s' % extra
+            ident += ":%s" % extra
 
             now = time.time()
             count, expiration = cache.get(ident, (1, None))
@@ -156,8 +164,8 @@ def throttle(max_requests, timeout=60 * 60, extra=''):
             if count >= max_requests and expiration > now:
                 t = rc.THROTTLED
                 wait = int(expiration - now)
-                t.content = 'Throttled, wait %d seconds.' % wait
-                t['Retry-After'] = wait
+                t.content = "Throttled, wait %d seconds." % wait
+                t["Retry-After"] = wait
                 return t
 
             cache.set(ident, (count + 1, expiration), (expiration - now))
@@ -188,7 +196,7 @@ def coerce_put_post(request):
         # the first time _load_post_and_files is called (both by wsgi.py and
         # modpython.py). If it's set, the request has to be 'reset' to redo
         # the query value parsing in POST mode.
-        if hasattr(request, '_post'):
+        if hasattr(request, "_post"):
             del request._post
             del request._files
 
@@ -197,9 +205,9 @@ def coerce_put_post(request):
             request._load_post_and_files()
             request.method = "PUT"
         except AttributeError:
-            request.META['REQUEST_METHOD'] = 'POST'
+            request.META["REQUEST_METHOD"] = "POST"
             request._load_post_and_files()
-            request.META['REQUEST_METHOD'] = 'PUT'
+            request.META["REQUEST_METHOD"] = "PUT"
 
         request.PUT = request.POST
 
@@ -222,7 +230,7 @@ class Mimer(object):
         content_type = self.content_type()
 
         if content_type is not None:
-            return content_type.lstrip().startswith('multipart')
+            return content_type.lstrip().startswith("multipart")
 
         return False
 
@@ -243,7 +251,7 @@ class Mimer(object):
         """
         type_formencoded = "application/x-www-form-urlencoded"
 
-        ctype = self.request.META.get('CONTENT_TYPE', type_formencoded)
+        ctype = self.request.META.get("CONTENT_TYPE", type_formencoded)
 
         if type_formencoded in ctype:
             return None
@@ -272,12 +280,12 @@ class Mimer(object):
             if loadee:
                 try:
                     incoming_data = self.request.body
-                    if 'application/json' in ctype and type(incoming_data) is bytes:
+                    if "application/json" in ctype and type(incoming_data) is bytes:
                         # Covers 'application/json' and 'application/json; charset=utf-8' equally
                         # If by some cursed miracle, we're dealing with a bytestring,
                         # then decode it back to a normal string, because json.loads
                         # will *not* handle binary data
-                        incoming_data = incoming_data.decode('utf-8')
+                        incoming_data = incoming_data.decode("utf-8")
 
                     self.request.data = loadee(incoming_data)
 
@@ -318,10 +326,10 @@ def require_mime(*mimes):
         realmimes = set()
 
         rewrite = {
-            'json': 'application/json',
-            'yaml': 'application/x-yaml',
-            'xml': 'text/xml',
-            'pickle': 'application/python-pickle',
+            "json": "application/json",
+            "yaml": "application/x-yaml",
+            "xml": "text/xml",
+            "pickle": "application/python-pickle",
         }
 
         for idx, mime in enumerate(mimes):
@@ -335,7 +343,7 @@ def require_mime(*mimes):
     return wrap
 
 
-require_extended = require_mime('json', 'yaml', 'xml', 'pickle')
+require_extended = require_mime("json", "yaml", "xml", "pickle")
 
 
 def send_consumer_mail(consumer):
@@ -350,7 +358,9 @@ def send_consumer_mail(consumer):
     template = "piston/mails/consumer_%s.txt" % consumer.status
 
     try:
-        body = loader.render_to_string(template, {'consumer': consumer, 'user': consumer.user})
+        body = loader.render_to_string(
+            template, {"consumer": consumer, "user": consumer.user}
+        )
     except TemplateDoesNotExist:
         """
         They haven't set up the templates, which means they might not want
@@ -366,7 +376,7 @@ def send_consumer_mail(consumer):
     if consumer.user:
         send_mail(_(subject), body, sender, [consumer.user.email], fail_silently=True)
 
-    if consumer.status == 'pending' and len(settings.ADMINS):
+    if consumer.status == "pending" and len(settings.ADMINS):
         mail_admins(_(subject), body, fail_silently=True)
 
     if settings.DEBUG and consumer.user:
