@@ -1,6 +1,6 @@
 import inspect
 
-from django.shortcuts import render_to_response
+from django.shortcuts import render
 from django.template import RequestContext
 from django.urls import get_callable, get_resolver, get_script_prefix
 
@@ -201,6 +201,4 @@ def documentation_view(request):
 
     docs.sort(_compare)
 
-    return render_to_response(
-        "documentation.html", {"docs": docs}, RequestContext(request)
-    )
+    return render(request, "documentation.html", {"docs": docs})
