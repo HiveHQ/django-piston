@@ -25,7 +25,7 @@ except NameError:
 
 from django.core import serializers
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Model, permalink
+from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.http import HttpResponse
 from django.urls import NoReverseMatch, reverse
@@ -44,9 +44,6 @@ try:
     import pickle as pickle
 except ImportError:
     import pickle
-
-# Allow people to change the reverser (default `permalink`).
-reverser = permalink
 
 
 class Emitter(object):
@@ -287,7 +284,7 @@ class Emitter(object):
                     url_id, fields = handler.resource_uri(data)
 
                     try:
-                        ret["resource_uri"] = reverser(lambda: (url_id, fields))()
+                        ret["resource_uri"] = reverse(url_id, fields)
                     except NoReverseMatch as e:
                         pass
 
