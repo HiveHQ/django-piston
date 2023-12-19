@@ -1,22 +1,24 @@
-import sys, inspect
+import inspect
+import sys
+import traceback
 
-from django.http import (HttpResponse, Http404, HttpResponseNotAllowed,
-    HttpResponseForbidden, HttpResponseServerError)
+from django.conf import settings
+from django.core.mail import EmailMessage, send_mail
+from django.db.models.query import QuerySet
+from django.http import (Http404, HttpResponse, HttpResponseForbidden,
+                         HttpResponseNotAllowed, HttpResponseServerError)
 from django.views.debug import ExceptionReporter
 from django.views.decorators.vary import vary_on_headers
-from django.conf import settings
-from django.core.mail import send_mail, EmailMessage
-from django.db.models.query import QuerySet
-from django.http import Http404
 
-from emitters import Emitter
-from handler import typemapper
-from doc import HandlerMethod
-from authentication import NoAuthentication
-from utils import coerce_put_post, FormValidationError, HttpStatusCode
-from utils import rc, format_error, translate_mime, MimerDataException
+from .authentication import NoAuthentication
+from .doc import HandlerMethod
+from .emitters import Emitter
+from .handler import typemapper
+from .utils import (FormValidationError, HttpStatusCode, MimerDataException,
+                    coerce_put_post, format_error, rc, translate_mime)
 
 CHALLENGE = object()
+
 
 class Resource(object):
     """
@@ -26,12 +28,12 @@ class Resource(object):
     is an authentication handler. If not specified,
     `NoAuthentication` will be used by default.
     """
-    callmap = { 'GET': 'read', 'POST': 'create',
-                'PUT': 'update', 'DELETE': 'delete' }
+
+    callmap = {'GET': 'read', 'POST': 'create', 'PUT': 'update', 'DELETE': 'delete'}
 
     def __init__(self, handler, authentication=None):
         if not callable(handler):
-            raise AttributeError, "Handler not callable."
+            raise AttributeError("Handler not callable.")
 
         self.handler = handler()
         self.csrf_exempt = getattr(self.handler, 'csrf_exempt', True)
@@ -72,7 +74,7 @@ class Resource(object):
         `Resource` subclass.
         """
         resp = rc.BAD_REQUEST
-        resp.write(' '+str(e.form.errors))
+        resp.write(' ' + str(e.form.errors))
         return resp
 
     @property
@@ -100,9 +102,7 @@ class Resource(object):
 
         for authenticator in self.authentication:
             if not authenticator.is_authenticated(request):
-                if self.anonymous and \
-                    rm in self.anonymous.allowed_methods:
-
+                if self.anonymous and rm in self.anonymous.allowed_methods:
                     actor, anonymous = self.anonymous(), True
                 else:
                     actor, anonymous = authenticator.challenge, CHALLENGE
@@ -165,7 +165,7 @@ class Resource(object):
 
         try:
             result = meth(request, *args, **kwargs)
-        except Exception, e:
+        except Exception as e:
             result = self.error_handler(e, request, meth, em_format)
 
         try:
@@ -200,8 +200,10 @@ class Resource(object):
             before sending it to the client. Won't matter for
             smaller datasets, but larger will have an impact.
             """
-            if self.stream: stream = srl.stream_render(request)
-            else: stream = srl.render(request)
+            if self.stream:
+                stream = srl.stream_render(request)
+            else:
+                stream = srl.render(request)
 
             if not isinstance(stream, HttpResponse):
                 resp = HttpResponse(stream, content_type=ct, status=status_code)
@@ -211,7 +213,7 @@ class Resource(object):
             resp.streaming = self.stream
 
             return resp
-        except HttpStatusCode, e:
+        except HttpStatusCode as e:
             return e.response
 
     @staticmethod
@@ -221,9 +223,9 @@ class Resource(object):
         request object, and returns the sanitized version.
         """
         for method_type in ('GET', 'PUT', 'POST', 'DELETE'):
-            block = getattr(request, method_type, { })
+            block = getattr(request, method_type, {})
 
-            if True in [ k.startswith("oauth_") for k in block.keys() ]:
+            if True in [k.startswith("oauth_") for k in block.keys()]:
                 sanitized = block.copy()
 
                 for k in sanitized.keys():
@@ -240,19 +242,23 @@ class Resource(object):
         subject = "Piston crash report"
         html = reporter.get_traceback_html()
 
-        message = EmailMessage(settings.EMAIL_SUBJECT_PREFIX+subject,
-                                html, settings.SERVER_EMAIL,
-                                [ admin[1] for admin in settings.ADMINS ])
+        message = EmailMessage(
+            settings.EMAIL_SUBJECT_PREFIX + subject,
+            html,
+            settings.SERVER_EMAIL,
+            [admin[1] for admin in settings.ADMINS],
+        )
 
         message.content_subtype = 'html'
         message.send(fail_silently=True)
-
 
     def error_handler(self, e, request, meth, em_format):
         """
         Override this method to add handling of errors customized for your
         needs
         """
+        traceback.print_exc()
+
         if isinstance(e, FormValidationError):
             return self.form_validation_response(e)
 
@@ -299,7 +305,6 @@ class Resource(object):
             if self.email_errors:
                 self.email_exception(rep)
             if self.display_errors:
-                return HttpResponseServerError(
-                    format_error('\n'.join(rep.format_exception())))
+                return HttpResponseServerError(format_error('\n'.join(rep.format_exception())))
             else:
                 raise

@@ -1,18 +1,17 @@
 import binascii
-
-import oauth
-from django.http import HttpResponse, HttpResponseRedirect
-from django.contrib.auth.models import User, AnonymousUser
-from django.contrib.auth.decorators import login_required
-from django.template import loader
-from django.contrib.auth import authenticate
 from django.conf import settings
-from django.core.urlresolvers import get_callable
+from django.contrib.auth import authenticate
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ImproperlyConfigured
+from django.core.urlresolvers import get_callable
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response
-from django.template import RequestContext
-
+from django.template import loader, RequestContext
 from piston import forms
+
+from . import oauth
+
 
 class NoAuthentication(object):
     """
@@ -20,8 +19,10 @@ class NoAuthentication(object):
     True, so no authentication is needed, nor
     initiated (`challenge` is missing.)
     """
+
     def is_authenticated(self, request):
         return True
+
 
 class HttpBasicAuthentication(object):
     """
@@ -37,6 +38,7 @@ class HttpBasicAuthentication(object):
         This will usually be a `HttpResponse` object with
         some kind of challenge headers and 401 code on it.
     """
+
     def __init__(self, auth_func=authenticate, realm='API'):
         self.auth_func = auth_func
         self.realm = realm
@@ -58,8 +60,7 @@ class HttpBasicAuthentication(object):
         except (ValueError, binascii.Error):
             return False
 
-        request.user = self.auth_func(username=username, password=password) \
-            or AnonymousUser()
+        request.user = self.auth_func(username=username, password=password) or AnonymousUser()
 
         return not request.user in (False, None, AnonymousUser())
 
@@ -70,7 +71,8 @@ class HttpBasicAuthentication(object):
         return resp
 
     def __repr__(self):
-        return u'<HTTPBasic: realm=%s>' % self.realm
+        return '<HTTPBasic: realm=%s>' % self.realm
+
 
 class HttpBasicSimple(HttpBasicAuthentication):
     def __init__(self, realm, username, password):
@@ -83,37 +85,39 @@ class HttpBasicSimple(HttpBasicAuthentication):
         if username == self.user.username and password == self.password:
             return self.user
 
+
 def load_data_store():
-    '''Load data store for OAuth Consumers, Tokens, Nonces and Resources
-    '''
+    '''Load data store for OAuth Consumers, Tokens, Nonces and Resources'''
     path = getattr(settings, 'OAUTH_DATA_STORE', 'piston.store.DataStore')
 
     # stolen from django.contrib.auth.load_backend
     i = path.rfind('.')
-    module, attr = path[:i], path[i+1:]
+    module, attr = path[:i], path[i + 1 :]
 
     try:
         mod = __import__(module, {}, {}, attr)
-    except ImportError, e:
-        raise ImproperlyConfigured, 'Error importing OAuth data store %s: "%s"' % (module, e)
+    except ImportError as e:
+        raise ImproperlyConfigured('Error importing OAuth data store %s: "%s"' % (module, e))
 
     try:
         cls = getattr(mod, attr)
     except AttributeError:
-        raise ImproperlyConfigured, 'Module %s does not define a "%s" OAuth data store' % (module, attr)
+        raise ImproperlyConfigured('Module %s does not define a "%s" OAuth data store' % (module, attr))
 
     return cls
 
+
 # Set the datastore here.
 oauth_datastore = load_data_store()
+
 
 def initialize_server_request(request):
     """
     Shortcut for initialization.
     """
     # c.f. http://www.mail-archive.com/oauth@googlegroups.com/msg01556.html
-    if (request.method == 'POST' and request.FILES == {}):
-        params = dict(request.REQUEST.items())
+    if request.method == 'POST' and request.FILES == {}:
+        params = dict(list(request.REQUEST.items()))
     else:
         params = {}
 
@@ -122,9 +126,12 @@ def initialize_server_request(request):
     request.META['Authorization'] = request.META.get('HTTP_AUTHORIZATION', '')
 
     oauth_request = oauth.OAuthRequest.from_request(
-        request.method, request.build_absolute_uri(),
-        headers=request.META, parameters=params,
-        query_string=request.environ.get('QUERY_STRING', ''))
+        request.method,
+        request.build_absolute_uri(),
+        headers=request.META,
+        parameters=params,
+        query_string=request.environ.get('QUERY_STRING', ''),
+    )
 
     if oauth_request:
         oauth_server = oauth.OAuthServer(oauth_datastore(oauth_request))
@@ -134,6 +141,7 @@ def initialize_server_request(request):
         oauth_server = None
 
     return oauth_server, oauth_request
+
 
 def send_oauth_error(err=None):
     """
@@ -145,10 +153,11 @@ def send_oauth_error(err=None):
     realm = 'OAuth'
     header = oauth.build_authenticate_header(realm=realm)
 
-    for k, v in header.iteritems():
+    for k, v in list(header.items()):
         response[k] = v
 
     return response
+
 
 def oauth_request_token(request):
     oauth_server, oauth_request = initialize_server_request(request)
@@ -159,20 +168,23 @@ def oauth_request_token(request):
         token = oauth_server.fetch_request_token(oauth_request)
 
         response = HttpResponse(token.to_string())
-    except oauth.OAuthError, err:
+    except oauth.OAuthError as err:
         response = send_oauth_error(err)
 
     return response
 
+
 def oauth_auth_view(request, token, callback, params):
-    form = forms.OAuthAuthenticationForm(initial={
-        'oauth_token': token.key,
-        'oauth_callback': token.get_callback_url() or callback,
-      })
+    form = forms.OAuthAuthenticationForm(
+        initial={
+            'oauth_token': token.key,
+            'oauth_callback': token.get_callback_url() or callback,
+        }
+    )
 
     context = dict(form=form, token=token)
-    return render_to_response('piston/authorize_token.html',
-            context, RequestContext(request))
+    return render_to_response('piston/authorize_token.html', context, RequestContext(request))
+
 
 @login_required
 def oauth_user_auth(request):
@@ -183,7 +195,7 @@ def oauth_user_auth(request):
 
     try:
         token = oauth_server.fetch_request_token(oauth_request)
-    except oauth.OAuthError, err:
+    except oauth.OAuthError as err:
         return send_oauth_error(err)
 
     try:
@@ -204,7 +216,7 @@ def oauth_user_auth(request):
             form = forms.OAuthAuthenticationForm(request.POST)
             if form.is_valid():
                 token = oauth_server.authorize_token(token, request.user)
-                args = '?'+token.to_string(only_key=True)
+                args = '?' + token.to_string(only_key=True)
             else:
                 args = '?error=%s' % 'Access not granted by user.'
 
@@ -212,14 +224,15 @@ def oauth_user_auth(request):
                 callback = getattr(settings, 'OAUTH_CALLBACK_VIEW')
                 return get_callable(callback)(request, token)
 
-            response = HttpResponseRedirect(callback+args)
+            response = HttpResponseRedirect(callback + args)
 
-        except oauth.OAuthError, err:
+        except oauth.OAuthError as err:
             response = send_oauth_error(err)
     else:
         response = HttpResponse('Action not allowed.')
 
     return response
+
 
 def oauth_access_token(request):
     oauth_server, oauth_request = initialize_server_request(request)
@@ -230,15 +243,18 @@ def oauth_access_token(request):
     try:
         token = oauth_server.fetch_access_token(oauth_request, required=True)
         return HttpResponse(token.to_string())
-    except oauth.OAuthError, err:
+    except oauth.OAuthError as err:
         return send_oauth_error(err)
 
+
 INVALID_PARAMS_RESPONSE = send_oauth_error(oauth.OAuthError('Invalid request parameters.'))
+
 
 class OAuthAuthentication(object):
     """
     OAuth authentication. Based on work by Leah Culver.
     """
+
     def __init__(self, realm='API'):
         self.realm = realm
         self.builder = oauth.build_authenticate_header
@@ -254,8 +270,8 @@ class OAuthAuthentication(object):
         if self.is_valid_request(request):
             try:
                 consumer, token, parameters = self.validate_token(request)
-            except oauth.OAuthError, err:
-                print send_oauth_error(err)
+            except oauth.OAuthError as err:
+                print((send_oauth_error(err)))
                 return False
 
             if consumer and token:
@@ -281,10 +297,9 @@ class OAuthAuthentication(object):
         response.status_code = 401
         realm = 'API'
 
-        for k, v in self.builder(realm=realm).iteritems():
+        for k, v in list(self.builder(realm=realm).items()):
             response[k] = v
-        tmpl = loader.render_to_string('oauth/challenge.html',
-            { 'MEDIA_URL': settings.MEDIA_URL })
+        tmpl = loader.render_to_string('oauth/challenge.html', {'MEDIA_URL': settings.MEDIA_URL})
 
         response.content = tmpl
         return response
@@ -297,11 +312,12 @@ class OAuthAuthentication(object):
         which is by the way the preferred method according to
         OAuth spec, but otherwise fall back to `GET` and `POST`.
         """
-        must_have = [ 'oauth_'+s for s in [
-            'consumer_key', 'token', 'signature',
-            'signature_method', 'timestamp', 'nonce' ] ]
+        must_have = [
+            'oauth_' + s
+            for s in ['consumer_key', 'token', 'signature', 'signature_method', 'timestamp', 'nonce']
+        ]
 
-        is_in = lambda l: all([ (p in l) for p in must_have ])
+        is_in = lambda l: all([(p in l) for p in must_have])
 
         auth_params = request.META.get("HTTP_AUTHORIZATION", "")
         req_params = request.REQUEST
@@ -312,4 +328,3 @@ class OAuthAuthentication(object):
     def validate_token(request, check_timestamp=True, check_nonce=True):
         oauth_server, oauth_request = initialize_server_request(request)
         return oauth_server.verify_request(oauth_request)
-
