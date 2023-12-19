@@ -1,5 +1,3 @@
-
-
 import copy
 import decimal
 import inspect
@@ -27,10 +25,10 @@ except NameError:
 
 from django.core import serializers
 from django.core.serializers.json import DjangoJSONEncoder
-from django.core.urlresolvers import NoReverseMatch, reverse
-from django.db.models import Model, permalink
+from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.http import HttpResponse
+from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import smart_str
 from django.utils.xmlutils import SimplerXMLGenerator
 
@@ -46,9 +44,6 @@ try:
     import pickle as pickle
 except ImportError:
     import pickle
-
-# Allow people to change the reverser (default `permalink`).
-reverser = permalink
 
 
 class Emitter(object):
@@ -66,7 +61,17 @@ class Emitter(object):
 
     EMITTERS = {}
     RESERVED_FIELDS = set(
-        ['read', 'update', 'create', 'delete', 'model', 'anonymous', 'allowed_methods', 'fields', 'exclude']
+        [
+            "read",
+            "update",
+            "create",
+            "delete",
+            "model",
+            "anonymous",
+            "allowed_methods",
+            "fields",
+            "exclude",
+        ]
     )
 
     def __init__(self, payload, typemapper, handler, fields=(), anonymous=True):
@@ -123,11 +128,13 @@ class Emitter(object):
             elif inspect.isfunction(thing):
                 if not inspect.getargspec(thing)[0]:
                     ret = _any(thing())
-            elif hasattr(thing, '__emittable__'):
+            elif hasattr(thing, "__emittable__"):
                 f = thing.__emittable__
                 if inspect.ismethod(f) and len(inspect.getargspec(f)[0]) == 1:
                     ret = _any(f())
-            elif repr(thing).startswith("<django.db.models.fields.related.RelatedManager"):
+            elif repr(thing).startswith(
+                "<django.db.models.fields.related.RelatedManager"
+            ):
                 ret = _any(thing.all())
             else:
                 ret = smart_str(thing, strings_only=True)
@@ -173,7 +180,7 @@ class Emitter(object):
                     get_fields = set(mapped.fields)
                     exclude_fields = set(mapped.exclude).difference(get_fields)
 
-                    if 'absolute_uri' in get_fields:
+                    if "absolute_uri" in get_fields:
                         get_absolute_uri = True
 
                     if not get_fields:
@@ -184,7 +191,7 @@ class Emitter(object):
                             ]
                         )
 
-                    if hasattr(mapped, 'extra_fields'):
+                    if hasattr(mapped, "extra_fields"):
                         get_fields.update(mapped.extra_fields)
 
                     # sets can be negated.
@@ -204,7 +211,7 @@ class Emitter(object):
 
                 for f in data._meta.local_fields + data._meta.virtual_fields:
                     if (
-                        hasattr(f, 'serialize')
+                        hasattr(f, "serialize")
                         and f.serialize
                         and not any([p in met_fields for p in [f.attname, f.name]])
                     ):
@@ -230,7 +237,7 @@ class Emitter(object):
                         inst = getattr(data, model, None)
 
                         if inst:
-                            if hasattr(inst, 'all'):
+                            if hasattr(inst, "all"):
                                 ret[model] = _related(inst, fields)
                             elif callable(inst):
                                 if len(inspect.getargspec(inst)[0]) == 1:
@@ -253,7 +260,9 @@ class Emitter(object):
                             else:
                                 ret[maybe_field] = _any(maybe)
                         else:
-                            handler_f = getattr(handler or self.handler, maybe_field, None)
+                            handler_f = getattr(
+                                handler or self.handler, maybe_field, None
+                            )
 
                             if handler_f:
                                 ret[maybe_field] = _any(handler_f(data))
@@ -271,24 +280,24 @@ class Emitter(object):
             # resouce uri
             if self.in_typemapper(type(data), self.anonymous):
                 handler = self.in_typemapper(type(data), self.anonymous)
-                if hasattr(handler, 'resource_uri'):
+                if hasattr(handler, "resource_uri"):
                     url_id, fields = handler.resource_uri(data)
 
                     try:
-                        ret['resource_uri'] = reverser(lambda: (url_id, fields))()
+                        ret["resource_uri"] = reverse(url_id, fields)
                     except NoReverseMatch as e:
                         pass
 
-            if hasattr(data, 'get_api_url') and 'resource_uri' not in ret:
+            if hasattr(data, "get_api_url") and "resource_uri" not in ret:
                 try:
-                    ret['resource_uri'] = data.get_api_url()
+                    ret["resource_uri"] = data.get_api_url()
                 except:
                     pass
 
             # absolute uri
-            if hasattr(data, 'get_absolute_url') and get_absolute_uri:
+            if hasattr(data, "get_absolute_url") and get_absolute_uri:
                 try:
-                    ret['absolute_uri'] = data.get_absolute_url()
+                    ret["absolute_uri"] = data.get_absolute_url()
                 except:
                     pass
 
@@ -347,7 +356,7 @@ class Emitter(object):
         raise ValueError("No emitters found for type %s" % format)
 
     @classmethod
-    def register(cls, name, klass, content_type='text/plain'):
+    def register(cls, name, klass, content_type="text/plain"):
         """
         Register an emitter.
 
@@ -397,8 +406,8 @@ class XMLEmitter(Emitter):
         return stream.getvalue()
 
 
-Emitter.register('xml', XMLEmitter, 'text/xml; charset=utf-8')
-Mimer.register(lambda *a: None, ('text/xml',))
+Emitter.register("xml", XMLEmitter, "text/xml; charset=utf-8")
+Mimer.register(lambda *a: None, ("text/xml",))
 
 
 class JSONEmitter(Emitter):
@@ -407,18 +416,20 @@ class JSONEmitter(Emitter):
     """
 
     def render(self, request):
-        cb = request.GET.get('callback', None)
-        seria = json.dumps(self.construct(), cls=DjangoJSONEncoder, ensure_ascii=False, indent=4)
+        cb = request.GET.get("callback", None)
+        seria = json.dumps(
+            self.construct(), cls=DjangoJSONEncoder, ensure_ascii=False, indent=4
+        )
 
         # Callback
         if cb and is_valid_jsonp_callback_value(cb):
-            return '%s(%s)' % (cb, seria)
+            return "%s(%s)" % (cb, seria)
 
         return seria
 
 
-Emitter.register('json', JSONEmitter, 'application/json; charset=utf-8')
-Mimer.register(json.loads, ('application/json',))
+Emitter.register("json", JSONEmitter, "application/json; charset=utf-8")
+Mimer.register(json.loads, ("application/json",))
 
 
 class YAMLEmitter(Emitter):
@@ -432,8 +443,8 @@ class YAMLEmitter(Emitter):
 
 
 if yaml:  # Only register yaml if it was import successfully.
-    Emitter.register('yaml', YAMLEmitter, 'application/x-yaml; charset=utf-8')
-    Mimer.register(lambda s: dict(yaml.load(s)), ('application/x-yaml',))
+    Emitter.register("yaml", YAMLEmitter, "application/x-yaml; charset=utf-8")
+    Mimer.register(lambda s: dict(yaml.load(s)), ("application/x-yaml",))
 
 
 class PickleEmitter(Emitter):
@@ -445,7 +456,7 @@ class PickleEmitter(Emitter):
         return pickle.dumps(self.construct())
 
 
-Emitter.register('pickle', PickleEmitter, 'application/python-pickle')
+Emitter.register("pickle", PickleEmitter, "application/python-pickle")
 
 """
 WARNING: Accepting arbitrary pickled data is a huge security concern.
@@ -464,7 +475,7 @@ class DjangoEmitter(Emitter):
     Emitter for the Django serialized format.
     """
 
-    def render(self, request, format='xml'):
+    def render(self, request, format="xml"):
         if isinstance(self.data, HttpResponse):
             return self.data
         elif isinstance(self.data, (int, str)):
@@ -475,4 +486,4 @@ class DjangoEmitter(Emitter):
         return response
 
 
-Emitter.register('django', DjangoEmitter, 'text/xml; charset=utf-8')
+Emitter.register("django", DjangoEmitter, "text/xml; charset=utf-8")

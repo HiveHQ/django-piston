@@ -1,13 +1,15 @@
 import binascii
+
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ImproperlyConfigured
-from django.core.urlresolvers import get_callable
 from django.http import HttpResponse, HttpResponseRedirect
-from django.shortcuts import render_to_response
-from django.template import loader, RequestContext
+from django.shortcuts import render
+from django.template import RequestContext, loader
+from django.urls import get_callable
+
 from piston import forms
 
 from . import oauth
@@ -39,12 +41,12 @@ class HttpBasicAuthentication(object):
         some kind of challenge headers and 401 code on it.
     """
 
-    def __init__(self, auth_func=authenticate, realm='API'):
+    def __init__(self, auth_func=authenticate, realm="API"):
         self.auth_func = auth_func
         self.realm = realm
 
     def is_authenticated(self, request):
-        auth_string = request.META.get('HTTP_AUTHORIZATION', None)
+        auth_string = request.META.get("HTTP_AUTHORIZATION", None)
 
         if not auth_string:
             return False
@@ -52,26 +54,28 @@ class HttpBasicAuthentication(object):
         try:
             (authmeth, auth) = auth_string.split(" ", 1)
 
-            if not authmeth.lower() == 'basic':
+            if not authmeth.lower() == "basic":
                 return False
 
-            auth = auth.strip().decode('base64')
-            (username, password) = auth.split(':', 1)
+            auth = auth.strip().decode("base64")
+            (username, password) = auth.split(":", 1)
         except (ValueError, binascii.Error):
             return False
 
-        request.user = self.auth_func(username=username, password=password) or AnonymousUser()
+        request.user = (
+            self.auth_func(username=username, password=password) or AnonymousUser()
+        )
 
         return not request.user in (False, None, AnonymousUser())
 
     def challenge(self, request=None):
         resp = HttpResponse("Authorization Required")
-        resp['WWW-Authenticate'] = 'Basic realm="%s"' % self.realm
+        resp["WWW-Authenticate"] = 'Basic realm="%s"' % self.realm
         resp.status_code = 401
         return resp
 
     def __repr__(self):
-        return '<HTTPBasic: realm=%s>' % self.realm
+        return "<HTTPBasic: realm=%s>" % self.realm
 
 
 class HttpBasicSimple(HttpBasicAuthentication):
@@ -87,22 +91,26 @@ class HttpBasicSimple(HttpBasicAuthentication):
 
 
 def load_data_store():
-    '''Load data store for OAuth Consumers, Tokens, Nonces and Resources'''
-    path = getattr(settings, 'OAUTH_DATA_STORE', 'piston.store.DataStore')
+    """Load data store for OAuth Consumers, Tokens, Nonces and Resources"""
+    path = getattr(settings, "OAUTH_DATA_STORE", "piston.store.DataStore")
 
     # stolen from django.contrib.auth.load_backend
-    i = path.rfind('.')
+    i = path.rfind(".")
     module, attr = path[:i], path[i + 1 :]
 
     try:
         mod = __import__(module, {}, {}, attr)
     except ImportError as e:
-        raise ImproperlyConfigured('Error importing OAuth data store %s: "%s"' % (module, e))
+        raise ImproperlyConfigured(
+            'Error importing OAuth data store %s: "%s"' % (module, e)
+        )
 
     try:
         cls = getattr(mod, attr)
     except AttributeError:
-        raise ImproperlyConfigured('Module %s does not define a "%s" OAuth data store' % (module, attr))
+        raise ImproperlyConfigured(
+            'Module %s does not define a "%s" OAuth data store' % (module, attr)
+        )
 
     return cls
 
@@ -116,21 +124,21 @@ def initialize_server_request(request):
     Shortcut for initialization.
     """
     # c.f. http://www.mail-archive.com/oauth@googlegroups.com/msg01556.html
-    if request.method == 'POST' and request.FILES == {}:
+    if request.method == "POST" and request.FILES == {}:
         params = dict(list(request.REQUEST.items()))
     else:
         params = {}
 
     # Seems that we want to put HTTP_AUTHORIZATION into 'Authorization'
     # for oauth.py to understand. Lovely.
-    request.META['Authorization'] = request.META.get('HTTP_AUTHORIZATION', '')
+    request.META["Authorization"] = request.META.get("HTTP_AUTHORIZATION", "")
 
     oauth_request = oauth.OAuthRequest.from_request(
         request.method,
         request.build_absolute_uri(),
         headers=request.META,
         parameters=params,
-        query_string=request.environ.get('QUERY_STRING', ''),
+        query_string=request.environ.get("QUERY_STRING", ""),
     )
 
     if oauth_request:
@@ -147,10 +155,10 @@ def send_oauth_error(err=None):
     """
     Shortcut for sending an error.
     """
-    response = HttpResponse(err.message.encode('utf-8'))
+    response = HttpResponse(err.message.encode("utf-8"))
     response.status_code = 401
 
-    realm = 'OAuth'
+    realm = "OAuth"
     header = oauth.build_authenticate_header(realm=realm)
 
     for k, v in list(header.items()):
@@ -177,13 +185,17 @@ def oauth_request_token(request):
 def oauth_auth_view(request, token, callback, params):
     form = forms.OAuthAuthenticationForm(
         initial={
-            'oauth_token': token.key,
-            'oauth_callback': token.get_callback_url() or callback,
+            "oauth_token": token.key,
+            "oauth_callback": token.get_callback_url() or callback,
         }
     )
 
     context = dict(form=form, token=token)
-    return render_to_response('piston/authorize_token.html', context, RequestContext(request))
+    return render(
+        request,
+        "piston/authorize_token.html",
+        context,
+    )
 
 
 @login_required
@@ -206,7 +218,7 @@ def oauth_user_auth(request):
     if request.method == "GET":
         params = oauth_request.get_normalized_parameters()
 
-        oauth_view = getattr(settings, 'OAUTH_AUTH_VIEW', None)
+        oauth_view = getattr(settings, "OAUTH_AUTH_VIEW", None)
         if oauth_view is None:
             return oauth_auth_view(request, token, callback, params)
         else:
@@ -216,12 +228,12 @@ def oauth_user_auth(request):
             form = forms.OAuthAuthenticationForm(request.POST)
             if form.is_valid():
                 token = oauth_server.authorize_token(token, request.user)
-                args = '?' + token.to_string(only_key=True)
+                args = "?" + token.to_string(only_key=True)
             else:
-                args = '?error=%s' % 'Access not granted by user.'
+                args = "?error=%s" % "Access not granted by user."
 
             if not callback:
-                callback = getattr(settings, 'OAUTH_CALLBACK_VIEW')
+                callback = getattr(settings, "OAUTH_CALLBACK_VIEW")
                 return get_callable(callback)(request, token)
 
             response = HttpResponseRedirect(callback + args)
@@ -229,7 +241,7 @@ def oauth_user_auth(request):
         except oauth.OAuthError as err:
             response = send_oauth_error(err)
     else:
-        response = HttpResponse('Action not allowed.')
+        response = HttpResponse("Action not allowed.")
 
     return response
 
@@ -247,7 +259,9 @@ def oauth_access_token(request):
         return send_oauth_error(err)
 
 
-INVALID_PARAMS_RESPONSE = send_oauth_error(oauth.OAuthError('Invalid request parameters.'))
+INVALID_PARAMS_RESPONSE = send_oauth_error(
+    oauth.OAuthError("Invalid request parameters.")
+)
 
 
 class OAuthAuthentication(object):
@@ -255,7 +269,7 @@ class OAuthAuthentication(object):
     OAuth authentication. Based on work by Leah Culver.
     """
 
-    def __init__(self, realm='API'):
+    def __init__(self, realm="API"):
         self.realm = realm
         self.builder = oauth.build_authenticate_header
 
@@ -295,11 +309,13 @@ class OAuthAuthentication(object):
         """
         response = HttpResponse()
         response.status_code = 401
-        realm = 'API'
+        realm = "API"
 
         for k, v in list(self.builder(realm=realm).items()):
             response[k] = v
-        tmpl = loader.render_to_string('oauth/challenge.html', {'MEDIA_URL': settings.MEDIA_URL})
+        tmpl = loader.render_to_string(
+            "oauth/challenge.html", {"MEDIA_URL": settings.MEDIA_URL}
+        )
 
         response.content = tmpl
         return response
@@ -313,8 +329,15 @@ class OAuthAuthentication(object):
         OAuth spec, but otherwise fall back to `GET` and `POST`.
         """
         must_have = [
-            'oauth_' + s
-            for s in ['consumer_key', 'token', 'signature', 'signature_method', 'timestamp', 'nonce']
+            "oauth_" + s
+            for s in [
+                "consumer_key",
+                "token",
+                "signature",
+                "signature_method",
+                "timestamp",
+                "nonce",
+            ]
         ]
 
         is_in = lambda l: all([(p in l) for p in must_have])

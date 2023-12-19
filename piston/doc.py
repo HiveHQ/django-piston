@@ -1,7 +1,9 @@
 import inspect
-from django.core.urlresolvers import get_callable, get_resolver, get_script_prefix
-from django.shortcuts import render_to_response
+
+from django.shortcuts import render
 from django.template import RequestContext
+from django.urls import get_callable, get_resolver, get_script_prefix
+
 from piston.handler import handler_tracker, typemapper
 
 from . import handler
@@ -28,7 +30,7 @@ class HandlerMethod(object):
         args, _, _, defaults = inspect.getargspec(self.method)
 
         for idx, arg in enumerate(args):
-            if arg in ('self', 'request', 'form'):
+            if arg in ("self", "request", "form"):
                 continue
 
             didx = len(args) - idx
@@ -46,9 +48,9 @@ class HandlerMethod(object):
             spec += argn
 
             if argdef:
-                spec += '=%s' % argdef
+                spec += "=%s" % argdef
 
-            spec += ', '
+            spec += ", "
 
         spec = spec.rstrip(", ")
 
@@ -67,14 +69,14 @@ class HandlerMethod(object):
 
     @property
     def http_name(self):
-        if self.name == 'read':
-            return 'GET'
-        elif self.name == 'create':
-            return 'POST'
-        elif self.name == 'delete':
-            return 'DELETE'
-        elif self.name == 'update':
-            return 'PUT'
+        if self.name == "read":
+            return "GET"
+        elif self.name == "create":
+            return "POST"
+        elif self.name == "delete":
+            return "DELETE"
+        elif self.name == "update":
+            return "PUT"
 
     def __repr__(self):
         return "<Method: %s>" % self.name
@@ -91,13 +93,19 @@ class HandlerDocumentation(object):
             if not met:
                 continue
 
-            stale = inspect.getmodule(met.im_func) is not inspect.getmodule(self.handler)
+            stale = inspect.getmodule(met.im_func) is not inspect.getmodule(
+                self.handler
+            )
 
             if not self.handler.is_anonymous:
                 if met and (not stale or include_default):
                     yield HandlerMethod(met, stale)
             else:
-                if not stale or met.__name__ == "read" and 'GET' in self.allowed_methods:
+                if (
+                    not stale
+                    or met.__name__ == "read"
+                    and "GET" in self.allowed_methods
+                ):
                     yield HandlerMethod(met, stale)
 
     def get_all_methods(self):
@@ -108,7 +116,7 @@ class HandlerDocumentation(object):
         return self.handler.is_anonymous
 
     def get_model(self):
-        return getattr(self, 'model', None)
+        return getattr(self, "model", None)
 
     @property
     def has_anonymous(self):
@@ -141,7 +149,7 @@ class HandlerDocumentation(object):
         def _convert(template, params=[]):
             """URI template converter"""
             paths = template % dict([p, "{%s}" % p] for p in params)
-            return u'%s%s' % (get_script_prefix(), paths)
+            return "%s%s" % (get_script_prefix(), paths)
 
         try:
             resource_uri = self.handler.resource_uri()
@@ -172,7 +180,7 @@ class HandlerDocumentation(object):
     resource_uri_template = property(get_resource_uri_template)
 
     def __repr__(self):
-        return u'<Documentation for "%s">' % self.name
+        return '<Documentation for "%s">' % self.name
 
 
 def documentation_view(request):
@@ -193,4 +201,4 @@ def documentation_view(request):
 
     docs.sort(_compare)
 
-    return render_to_response('documentation.html', {'docs': docs}, RequestContext(request))
+    return render(request, "documentation.html", {"docs": docs})
