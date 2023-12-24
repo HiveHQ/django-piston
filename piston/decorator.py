@@ -53,9 +53,21 @@ def getinfo(func):
         argnames.append(varargs)
     if varkwargs:
         argnames.append(varkwargs)
-    signature = inspect.formatargspec(
-        regargs, varargs, varkwargs, defaults, formatvalue=lambda value: ""
-    )[1:-1]
+    # Assuming 'func' is your function
+    sig = inspect.signature(func)
+
+    # Constructing the signature string manually
+    param_list = []
+
+    for name, param in sig.parameters.items():
+        if param.default is param.empty:
+            param_str = name
+        else:
+            # Using '' for default values as per your original formatvalue
+            param_str = f"{name}=''"
+        param_list.append(param_str)
+
+    signature = f"({', '.join(param_list)})"
     return dict(
         name=func.__name__,
         argnames=argnames,
