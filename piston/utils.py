@@ -251,7 +251,7 @@ class Mimer(object):
         """
         type_formencoded = "application/x-www-form-urlencoded"
 
-        ctype = self.request.META.get("CONTENT_TYPE", type_formencoded)
+        ctype = self.request.headers.get("content-type", type_formencoded)
 
         if type_formencoded in ctype:
             return None

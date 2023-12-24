@@ -5,7 +5,7 @@ from django.contrib import admin
 class Blogpost(models.Model):
     title = models.CharField(max_length=255)
     content = models.TextField()
-    author = models.ForeignKey(User, related_name='posts')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
     created_on = models.DateTimeField(auto_now_add=True)
     
     def __unicode__(self):

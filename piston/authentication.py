@@ -46,7 +46,7 @@ class HttpBasicAuthentication(object):
         self.realm = realm
 
     def is_authenticated(self, request):
-        auth_string = request.META.get("HTTP_AUTHORIZATION", None)
+        auth_string = request.headers.get("authorization", None)
 
         if not auth_string:
             return False
@@ -131,7 +131,7 @@ def initialize_server_request(request):
 
     # Seems that we want to put HTTP_AUTHORIZATION into 'Authorization'
     # for oauth.py to understand. Lovely.
-    request.META["Authorization"] = request.META.get("HTTP_AUTHORIZATION", "")
+    request.META["Authorization"] = request.headers.get("authorization", "")
 
     oauth_request = oauth.OAuthRequest.from_request(
         request.method,
@@ -342,7 +342,7 @@ class OAuthAuthentication(object):
 
         is_in = lambda l: all([(p in l) for p in must_have])
 
-        auth_params = request.META.get("HTTP_AUTHORIZATION", "")
+        auth_params = request.headers.get("authorization", "")
         req_params = request.REQUEST
 
         return is_in(auth_params) or is_in(req_params)
