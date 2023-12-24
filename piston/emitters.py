@@ -126,11 +126,11 @@ class Emitter(object):
             elif isinstance(thing, HttpResponse):
                 raise HttpStatusCode(thing)
             elif inspect.isfunction(thing):
-                if not inspect.getargspec(thing)[0]:
+                if not inspect.getfullargspec(thing)[0]:
                     ret = _any(thing())
             elif hasattr(thing, "__emittable__"):
                 f = thing.__emittable__
-                if inspect.ismethod(f) and len(inspect.getargspec(f)[0]) == 1:
+                if inspect.ismethod(f) and len(inspect.getfullargspec(f)[0]) == 1:
                     ret = _any(f())
             elif repr(thing).startswith(
                 "<django.db.models.fields.related.RelatedManager"
@@ -240,7 +240,7 @@ class Emitter(object):
                             if hasattr(inst, "all"):
                                 ret[model] = _related(inst, fields)
                             elif callable(inst):
-                                if len(inspect.getargspec(inst)[0]) == 1:
+                                if len(inspect.getfullargspec(inst)[0]) == 1:
                                     ret[model] = _any(inst(), fields)
                             else:
                                 ret[model] = _model(inst, fields)
@@ -255,7 +255,7 @@ class Emitter(object):
                         maybe = getattr(data, maybe_field, None)
                         if maybe is not None:
                             if callable(maybe):
-                                if len(inspect.getargspec(maybe)[0]) <= 1:
+                                if len(inspect.getfullargspec(maybe)[0]) <= 1:
                                     ret[maybe_field] = _any(maybe())
                             else:
                                 ret[maybe_field] = _any(maybe)

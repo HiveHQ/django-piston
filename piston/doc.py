@@ -27,7 +27,7 @@ class HandlerMethod(object):
         self.stale = stale
 
     def iter_args(self):
-        args, _, _, defaults = inspect.getargspec(self.method)
+        args, _, _, defaults = inspect.getfullargspec(self.method)
 
         for idx, arg in enumerate(args):
             if arg in ("self", "request", "form"):
