@@ -2,6 +2,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+
 from django.contrib.auth.models import User
 from django.core.mail import mail_admins, send_mail
 from django.db import models
@@ -18,10 +19,10 @@ SECRET_SIZE = 32
 VERIFIER_SIZE = 10
 
 CONSUMER_STATES = (
-    ('pending', 'Pending'),
-    ('accepted', 'Accepted'),
-    ('canceled', 'Canceled'),
-    ('rejected', 'Rejected'),
+    ("pending", "Pending"),
+    ("accepted", "Accepted"),
+    ("canceled", "Canceled"),
+    ("rejected", "Rejected"),
 )
 
 
@@ -31,7 +32,7 @@ def generate_random(length=SECRET_SIZE):
 
 class Nonce(models.Model):
     class Meta:
-        app_label = 'piston'
+        app_label = "piston"
 
     token_key = models.CharField(max_length=KEY_SIZE)
     consumer_key = models.CharField(max_length=KEY_SIZE)
@@ -43,7 +44,7 @@ class Nonce(models.Model):
 
 class Consumer(models.Model):
     class Meta:
-        app_label = 'piston'
+        app_label = "piston"
 
     name = models.CharField(max_length=255)
     description = models.TextField()
@@ -51,8 +52,10 @@ class Consumer(models.Model):
     key = models.CharField(max_length=KEY_SIZE)
     secret = models.CharField(max_length=SECRET_SIZE)
 
-    status = models.CharField(max_length=16, choices=CONSUMER_STATES, default='pending')
-    user = models.ForeignKey(User, null=True, blank=True, related_name='consumers')
+    status = models.CharField(max_length=16, choices=CONSUMER_STATES, default="pending")
+    user = models.ForeignKey(
+        User, null=True, blank=True, related_name="consumers", on_delete=models.CASCADE
+    )
 
     objects = ConsumerManager()
 
@@ -83,11 +86,11 @@ class Consumer(models.Model):
 
 class Token(models.Model):
     class Meta:
-        app_label = 'piston'
+        app_label = "piston"
 
     REQUEST = 1
     ACCESS = 2
-    TOKEN_TYPES = ((REQUEST, 'Request'), (ACCESS, 'Access'))
+    TOKEN_TYPES = ((REQUEST, "Request"), (ACCESS, "Access"))
 
     key = models.CharField(max_length=KEY_SIZE)
     secret = models.CharField(max_length=SECRET_SIZE)
@@ -96,8 +99,10 @@ class Token(models.Model):
     timestamp = models.IntegerField(default=int(time.time()))
     is_approved = models.BooleanField(default=False)
 
-    user = models.ForeignKey(User, null=True, blank=True, related_name='tokens')
-    consumer = models.ForeignKey(Consumer)
+    user = models.ForeignKey(
+        User, null=True, blank=True, related_name="tokens", on_delete=models.CASCADE
+    )
+    consumer = models.ForeignKey(Consumer, on_delete=models.CASCADE)
 
     callback = models.CharField(max_length=255, null=True, blank=True)
     callback_confirmed = models.BooleanField(default=False)
@@ -105,20 +110,24 @@ class Token(models.Model):
     objects = TokenManager()
 
     def __unicode__(self):
-        return "%s Token %s for %s" % (self.get_token_type_display(), self.key, self.consumer)
+        return "%s Token %s for %s" % (
+            self.get_token_type_display(),
+            self.key,
+            self.consumer,
+        )
 
     def to_string(self, only_key=False):
         token_dict = {
-            'oauth_token': self.key,
-            'oauth_token_secret': self.secret,
-            'oauth_callback_confirmed': 'true',
+            "oauth_token": self.key,
+            "oauth_token_secret": self.secret,
+            "oauth_callback_confirmed": "true",
         }
 
         if self.verifier:
-            token_dict.update({'oauth_verifier': self.verifier})
+            token_dict.update({"oauth_verifier": self.verifier})
 
         if only_key:
-            del token_dict['oauth_token_secret']
+            del token_dict["oauth_token_secret"]
 
         return urllib.parse.urlencode(token_dict)
 
@@ -141,10 +150,12 @@ class Token(models.Model):
             parts = urllib.parse.urlparse(self.callback)
             scheme, netloc, path, params, query, fragment = parts[:6]
             if query:
-                query = '%s&oauth_verifier=%s' % (query, self.verifier)
+                query = "%s&oauth_verifier=%s" % (query, self.verifier)
             else:
-                query = 'oauth_verifier=%s' % self.verifier
-            return urllib.parse.urlunparse((scheme, netloc, path, params, query, fragment))
+                query = "oauth_verifier=%s" % self.verifier
+            return urllib.parse.urlunparse(
+                (scheme, netloc, path, params, query, fragment)
+            )
         return self.callback
 
     def set_callback(self, callback):

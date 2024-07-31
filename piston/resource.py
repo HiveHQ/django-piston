@@ -305,6 +305,12 @@ class Resource(object):
             if self.email_errors:
                 self.email_exception(rep)
             if self.display_errors:
-                return HttpResponseServerError(format_error('\n'.join(rep.format_exception())))
+                return HttpResponseServerError(
+                    format_error(
+                        traceback.format_exception(
+                            etype=exc_type, value=exc_value, tb=tb
+                        )
+                    )
+                )
             else:
                 raise
