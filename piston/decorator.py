@@ -11,12 +11,13 @@ for the documentation and below for the licence.
 
 __all__ = ["decorator", "new_wrapper", "getinfo"]
 
-import inspect, sys
+import inspect
 
 try:
     set
 except NameError:
     from sets import Set as set
+
 
 def getinfo(func):
     """
@@ -28,7 +29,7 @@ def getinfo(func):
     - doc (the docstring : str)
     - module (the module name : str)
     - dict (the function __dict__ : str)
-    
+
     >>> def f(self, x=1, y=2, *args, **kw): pass
 
     >>> info = getinfo(f)
@@ -37,7 +38,7 @@ def getinfo(func):
     'f'
     >>> info["argnames"]
     ['self', 'x', 'y', 'args', 'kw']
-    
+
     >>> info["defaults"]
     (1, 2)
 
@@ -45,60 +46,77 @@ def getinfo(func):
     'self, x, y, *args, **kw'
     """
     assert inspect.ismethod(func) or inspect.isfunction(func)
-    regargs, varargs, varkwargs, defaults = inspect.getargspec(func)
+    regargs, varargs, varkwargs, defaults = inspect.getfullargspec(func)[:4]
     argnames = list(regargs)
     if varargs:
         argnames.append(varargs)
     if varkwargs:
         argnames.append(varkwargs)
-    signature = inspect.formatargspec(regargs, varargs, varkwargs, defaults,
-                                      formatvalue=lambda value: "")[1:-1]
-    return dict(name=func.__name__, argnames=argnames, signature=signature,
-                defaults = func.__defaults__, doc=func.__doc__,
-                module=func.__module__, dict=func.__dict__,
-                globals=func.__globals__, closure=func.__closure__)
+    parts = list(regargs)
+    if varargs:
+        parts.append("*" + varargs)
+    if varkwargs:
+        parts.append("**" + varkwargs)
+    signature = ", ".join(parts)
+    return dict(
+        name=func.__name__,
+        argnames=argnames,
+        signature=signature,
+        defaults=func.__defaults__,
+        doc=func.__doc__,
+        module=func.__module__,
+        dict=func.__dict__,
+        globals=func.__globals__,
+        closure=func.__closure__,
+    )
+
 
 # akin to functools.update_wrapper
 def update_wrapper(wrapper, model, infodict=None):
     infodict = infodict or getinfo(model)
     try:
-        wrapper.__name__ = infodict['name']
-    except: # Python version < 2.4
+        wrapper.__name__ = infodict["name"]
+    except:  # Python version < 2.4
         pass
-    wrapper.__doc__ = infodict['doc']
-    wrapper.__module__ = infodict['module']
-    wrapper.__dict__.update(infodict['dict'])
-    wrapper.__defaults__ = infodict['defaults']
+    wrapper.__doc__ = infodict["doc"]
+    wrapper.__module__ = infodict["module"]
+    wrapper.__dict__.update(infodict["dict"])
+    wrapper.__defaults__ = infodict["defaults"]
     wrapper.undecorated = model
     return wrapper
+
 
 def new_wrapper(wrapper, model):
     """
     An improvement over functools.update_wrapper. The wrapper is a generic
-    callable object. It works by generating a copy of the wrapper with the 
+    callable object. It works by generating a copy of the wrapper with the
     right signature and by updating the copy, not the original.
     Moreovoer, 'model' can be a dictionary with keys 'name', 'doc', 'module',
     'dict', 'defaults'.
     """
     if isinstance(model, dict):
         infodict = model
-    else: # assume model is a function
+    else:  # assume model is a function
         infodict = getinfo(model)
-    assert not '_wrapper_' in infodict["argnames"], (
-        '"_wrapper_" is a reserved argument name!')
+    assert "_wrapper_" not in infodict["argnames"], (
+        '"_wrapper_" is a reserved argument name!'
+    )
     src = "lambda %(signature)s: _wrapper_(%(signature)s)" % infodict
     funcopy = eval(src, dict(_wrapper_=wrapper))
     return update_wrapper(funcopy, model, infodict)
 
+
 # helper used in decorator_factory
 def __call__(self, func):
     infodict = getinfo(func)
-    for name in ('_func_', '_self_'):
-        assert not name in infodict["argnames"], (
-           '%s is a reserved argument name!' % name)
+    for name in ("_func_", "_self_"):
+        assert name not in infodict["argnames"], (
+            "%s is a reserved argument name!" % name
+        )
     src = "lambda %(signature)s: _self_.call(_func_, %(signature)s)"
     new = eval(src % infodict, dict(_func_=func, _self_=self))
     return update_wrapper(new, func, infodict)
+
 
 def decorator_factory(cls):
     """
@@ -108,14 +126,13 @@ def decorator_factory(cls):
     method.
     """
     attrs = set(dir(cls))
-    if '__call__' in attrs:
-        raise TypeError('You cannot decorate a class with a nontrivial '
-                        '__call__ method')
-    if 'call' not in attrs:
-        raise TypeError('You cannot decorate a class without a '
-                        '.call method')
+    if "__call__" in attrs:
+        raise TypeError("You cannot decorate a class with a nontrivial __call__ method")
+    if "call" not in attrs:
+        raise TypeError("You cannot decorate a class without a .call method")
     cls.__call__ = __call__
     return cls
+
 
 def decorator(caller):
     """
@@ -126,7 +143,7 @@ def decorator(caller):
      def caller(func, *args, **kw):
          # do something
          return func(*args, **kw)
-    
+
     Here is an example of usage:
 
     >>> @decorator
@@ -136,7 +153,7 @@ def decorator(caller):
 
     >>> chatty.__name__
     'chatty'
-    
+
     >>> @chatty
     ... def f(): pass
     ...
@@ -149,28 +166,34 @@ def decorator(caller):
     """
     if inspect.isclass(caller):
         return decorator_factory(caller)
-    def _decorator(func): # the real meat is here
+
+    def _decorator(func):  # the real meat is here
         infodict = getinfo(func)
-        argnames = infodict['argnames']
-        assert not ('_call_' in argnames or '_func_' in argnames), (
-            'You cannot use _call_ or _func_ as argument names!')
+        argnames = infodict["argnames"]
+        assert not ("_call_" in argnames or "_func_" in argnames), (
+            "You cannot use _call_ or _func_ as argument names!"
+        )
         src = "lambda %(signature)s: _call_(_func_, %(signature)s)" % infodict
         # import sys; print >> sys.stderr, src # for debugging purposes
         dec_func = eval(src, dict(_func_=func, _call_=caller))
         return update_wrapper(dec_func, func, infodict)
+
     return update_wrapper(_decorator, caller)
 
+
 if __name__ == "__main__":
-    import doctest; doctest.testmod()
+    import doctest
+
+    doctest.testmod()
 
 ##########################     LEGALESE    ###############################
-      
-##   Redistributions of source code must retain the above copyright 
+
+##   Redistributions of source code must retain the above copyright
 ##   notice, this list of conditions and the following disclaimer.
 ##   Redistributions in bytecode form must reproduce the above copyright
 ##   notice, this list of conditions and the following disclaimer in
 ##   the documentation and/or other materials provided with the
-##   distribution. 
+##   distribution.
 
 ##   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 ##   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
