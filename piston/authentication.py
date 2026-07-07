@@ -4,9 +4,9 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ImproperlyConfigured
-from django.core.urlresolvers import get_callable
+from django.urls import get_callable
 from django.http import HttpResponse, HttpResponseRedirect
-from django.shortcuts import render_to_response
+from django.shortcuts import render
 from django.template import loader, RequestContext
 from piston import forms
 
@@ -183,7 +183,7 @@ def oauth_auth_view(request, token, callback, params):
     )
 
     context = dict(form=form, token=token)
-    return render_to_response('piston/authorize_token.html', context, RequestContext(request))
+    return render(request, 'piston/authorize_token.html', context)
 
 
 @login_required

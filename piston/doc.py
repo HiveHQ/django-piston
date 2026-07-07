@@ -1,8 +1,9 @@
 import inspect
 
-from django.core.urlresolvers import get_callable, get_resolver, get_script_prefix
-from django.shortcuts import render_to_response
+from django.shortcuts import render
 from django.template import RequestContext
+from django.urls import get_callable, get_resolver
+from django.urls.base import get_script_prefix
 
 from piston.handler import handler_tracker
 
@@ -201,6 +202,6 @@ def documentation_view(request):
 
     docs.sort(_compare)
 
-    return render_to_response(
-        "documentation.html", {"docs": docs}, RequestContext(request)
+    return render(
+        request, "documentation.html", {"docs": docs}
     )

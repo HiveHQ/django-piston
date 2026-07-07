@@ -5,11 +5,11 @@ from django import get_version as django_version
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import mail_admins, send_mail
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.http import (HttpResponse, HttpResponseBadRequest,
                          HttpResponseForbidden, HttpResponseNotAllowed)
 from django.template import TemplateDoesNotExist, loader
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 
 from .decorator import decorator
 

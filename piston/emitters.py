@@ -24,10 +24,10 @@ except NameError:
 
 from django.core import serializers
 from django.core.serializers.json import DjangoJSONEncoder
-from django.core.urlresolvers import NoReverseMatch
-from django.db.models import Model, permalink
+from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.http import HttpResponse
+from django.urls import NoReverseMatch
 from django.utils.encoding import smart_str
 from django.utils.xmlutils import SimplerXMLGenerator
 
@@ -44,8 +44,20 @@ try:
 except ImportError:
     import pickle
 
+
 # Allow people to change the reverser (default `permalink`).
-reverser = permalink
+def reverser(func):
+    from django.urls import reverse
+
+    def inner(*args, **kwargs):
+        bits = func(*args, **kwargs)
+        return reverse(
+            bits[0],
+            args=bits[1:2] and bits[1] or [],
+            kwargs=bits[2:3] and bits[2] or {},
+        )
+
+    return inner
 
 
 class Emitter(object):
