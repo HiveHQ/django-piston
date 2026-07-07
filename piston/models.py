@@ -52,7 +52,7 @@ class Consumer(models.Model):
     secret = models.CharField(max_length=SECRET_SIZE)
 
     status = models.CharField(max_length=16, choices=CONSUMER_STATES, default='pending')
-    user = models.ForeignKey(User, null=True, blank=True, related_name='consumers')
+    user = models.ForeignKey(User, null=True, blank=True, related_name='consumers', on_delete=models.CASCADE)
 
     objects = ConsumerManager()
 
@@ -96,8 +96,8 @@ class Token(models.Model):
     timestamp = models.IntegerField(default=int(time.time()))
     is_approved = models.BooleanField(default=False)
 
-    user = models.ForeignKey(User, null=True, blank=True, related_name='tokens')
-    consumer = models.ForeignKey(Consumer)
+    user = models.ForeignKey(User, null=True, blank=True, related_name='tokens', on_delete=models.CASCADE)
+    consumer = models.ForeignKey(Consumer, on_delete=models.CASCADE)
 
     callback = models.CharField(max_length=255, null=True, blank=True)
     callback_confirmed = models.BooleanField(default=False)
