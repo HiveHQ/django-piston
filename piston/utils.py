@@ -125,7 +125,7 @@ def throttle(max_requests, timeout=60 * 60, extra=""):
 
     @decorator
     def wrap(f, self, request, *args, **kwargs):
-        if request.user.is_authenticated():
+        if request.user.is_authenticated:
             ident = request.user.username
         else:
             ident = request.META.get("REMOTE_ADDR", None)
