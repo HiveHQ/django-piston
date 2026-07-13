@@ -1,12 +1,15 @@
-import inspect
 import sys
 import traceback
 
 from django.conf import settings
-from django.core.mail import EmailMessage, send_mail
+from django.core.mail import EmailMessage
 from django.db.models.query import QuerySet
-from django.http import (Http404, HttpResponse, HttpResponseForbidden,
-                         HttpResponseNotAllowed, HttpResponseServerError)
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseNotAllowed,
+    HttpResponseServerError,
+)
 from django.views.debug import ExceptionReporter
 from django.views.decorators.vary import vary_on_headers
 
@@ -14,8 +17,15 @@ from .authentication import NoAuthentication
 from .doc import HandlerMethod
 from .emitters import Emitter
 from .handler import typemapper
-from .utils import (FormValidationError, HttpStatusCode, MimerDataException,
-                    coerce_put_post, format_error, rc, translate_mime)
+from .utils import (
+    FormValidationError,
+    HttpStatusCode,
+    MimerDataException,
+    coerce_put_post,
+    format_error,
+    rc,
+    translate_mime,
+)
 
 CHALLENGE = object()
 
@@ -29,14 +39,14 @@ class Resource(object):
     `NoAuthentication` will be used by default.
     """
 
-    callmap = {'GET': 'read', 'POST': 'create', 'PUT': 'update', 'DELETE': 'delete'}
+    callmap = {"GET": "read", "POST": "create", "PUT": "update", "DELETE": "delete"}
 
     def __init__(self, handler, authentication=None):
         if not callable(handler):
             raise AttributeError("Handler not callable.")
 
         self.handler = handler()
-        self.csrf_exempt = getattr(self.handler, 'csrf_exempt', True)
+        self.csrf_exempt = getattr(self.handler, "csrf_exempt", True)
 
         if not authentication:
             self.authentication = (NoAuthentication(),)
@@ -46,9 +56,9 @@ class Resource(object):
             self.authentication = (authentication,)
 
         # Erroring
-        self.email_errors = getattr(settings, 'PISTON_EMAIL_ERRORS', True)
-        self.display_errors = getattr(settings, 'PISTON_DISPLAY_ERRORS', True)
-        self.stream = getattr(settings, 'PISTON_STREAM_OUTPUT', False)
+        self.email_errors = getattr(settings, "PISTON_EMAIL_ERRORS", True)
+        self.display_errors = getattr(settings, "PISTON_DISPLAY_ERRORS", True)
+        self.stream = getattr(settings, "PISTON_STREAM_OUTPUT", False)
 
     def determine_emitter(self, request, *args, **kwargs):
         """
@@ -60,10 +70,10 @@ class Resource(object):
         since that pretty much makes sense. Refer to `Mimer` for
         that as well.
         """
-        em = kwargs.pop('emitter_format', None)
+        em = kwargs.pop("emitter_format", None)
 
         if not em:
-            em = request.GET.get('format', 'json')
+            em = request.GET.get("format", "json")
 
         return em
 
@@ -74,7 +84,7 @@ class Resource(object):
         `Resource` subclass.
         """
         resp = rc.BAD_REQUEST
-        resp.write(' ' + str(e.form.errors))
+        resp.write(" " + str(e.form.errors))
         return resp
 
     @property
@@ -85,7 +95,7 @@ class Resource(object):
         anonymous handlers that aren't defined yet (like, when
         you're subclassing your basehandler into an anonymous one.)
         """
-        if hasattr(self.handler, 'anonymous'):
+        if hasattr(self.handler, "anonymous"):
             anon = self.handler.anonymous
 
             if callable(anon):
@@ -111,7 +121,7 @@ class Resource(object):
 
         return actor, anonymous
 
-    @vary_on_headers('Authorization')
+    @vary_on_headers("Authorization")
     def __call__(self, request, *args, **kwargs):
         """
         NB: Sends a `Vary` header so we don't cache requests
@@ -135,28 +145,28 @@ class Resource(object):
             handler = actor
 
         # Translate nested datastructs into `request.data` here.
-        if rm in ('POST', 'PUT'):
+        if rm in ("POST", "PUT"):
             try:
                 translate_mime(request)
             except MimerDataException:
                 return rc.BAD_REQUEST
-            if not hasattr(request, 'data'):
-                if rm == 'POST':
+            if not hasattr(request, "data"):
+                if rm == "POST":
                     request.data = request.POST
                 else:
                     request.data = request.PUT
 
-        if not rm in handler.allowed_methods:
+        if rm not in handler.allowed_methods:
             return HttpResponseNotAllowed(handler.allowed_methods)
 
-        meth = getattr(handler, self.callmap.get(rm, ''), None)
+        meth = getattr(handler, self.callmap.get(rm, ""), None)
         if not meth:
             raise Http404
 
         # Support emitter both through (?P<emitter_format>) and ?format=emitter.
         em_format = self.determine_emitter(request, *args, **kwargs)
 
-        kwargs.pop('emitter_format', None)
+        kwargs.pop("emitter_format", None)
 
         # Clean up the request object a bit, since we might
         # very well have `oauth_`-headers in there, and we
@@ -172,7 +182,9 @@ class Resource(object):
             emitter, ct = Emitter.get(em_format)
             fields = handler.fields
 
-            if hasattr(handler, 'list_fields') and isinstance(result, (list, tuple, QuerySet)):
+            if hasattr(handler, "list_fields") and isinstance(
+                result, (list, tuple, QuerySet)
+            ):
                 fields = handler.list_fields
         except ValueError:
             result = rc.BAD_REQUEST
@@ -222,7 +234,7 @@ class Resource(object):
         Removes `oauth_` keys from various dicts on the
         request object, and returns the sanitized version.
         """
-        for method_type in ('GET', 'PUT', 'POST', 'DELETE'):
+        for method_type in ("GET", "PUT", "POST", "DELETE"):
             block = getattr(request, method_type, {})
 
             if True in [k.startswith("oauth_") for k in block.keys()]:
@@ -249,7 +261,7 @@ class Resource(object):
             [admin[1] for admin in settings.ADMINS],
         )
 
-        message.content_subtype = 'html'
+        message.content_subtype = "html"
         message.send(fail_silently=True)
 
     def error_handler(self, e, request, meth, em_format):
@@ -267,15 +279,15 @@ class Resource(object):
             hm = HandlerMethod(meth)
             sig = hm.signature
 
-            msg = 'Method signature does not match.\n\n'
+            msg = "Method signature does not match.\n\n"
 
             if sig:
-                msg += 'Signature should be: %s' % sig
+                msg += "Signature should be: %s" % sig
             else:
-                msg += 'Resource does not expect any parameters.'
+                msg += "Resource does not expect any parameters."
 
             if self.display_errors:
-                msg += '\n\nException was: %s' % str(e)
+                msg += "\n\nException was: %s" % str(e)
 
             result.content = format_error(msg)
             return result
@@ -305,6 +317,12 @@ class Resource(object):
             if self.email_errors:
                 self.email_exception(rep)
             if self.display_errors:
-                return HttpResponseServerError(format_error('\n'.join(rep.format_exception())))
+                return HttpResponseServerError(
+                    format_error(
+                        "".join(
+                            traceback.format_exception(exc_type, exc_value, tb.tb_next)
+                        )
+                    )
+                )
             else:
                 raise
